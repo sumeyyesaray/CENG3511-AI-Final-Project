@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Muğla Smart Route Navigator</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .location-input-group {
+            position: relative;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        
+        .location-input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .location-input-group input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        
+        .map-select-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            height: 42px;
+        }
+        
+        .map-select-btn:hover {
+            background: #2563eb;
+            transform: scale(1.05);
+        }
+        
+        .map-select-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .map-select-btn.active {
+            background: #10b981;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+
+    background: #0f172a;          /* koyu zemin */
+    color: #e5e7eb;               /* AÇIK YAZI (ÇOK ÖNEMLİ) */
+
+    border: 1px solid #3b82f6;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 9999;
+
+    display: none;
+}
+
+        
+        .autocomplete-dropdown.show {
+            display: block;
+        }
+        
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.2s;
+        }
+        
+        .autocomplete-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+        
+        .autocomplete-loading {
+            padding: 10px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+        }
+        
+        .field label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .hint {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="hero">
+            <h1>🧠 Muğla Smart Route Navigator</h1>
+            <p>OSM Yol Ağı + Dijkstra ile En Kısa Yol (Gerçek Navigasyon)</p>
+        </header>
+
+        <main class="main-content">
+            <div class="control-sidebar">
+                <section class="panel">
+                    <div class="mode-container">
+                        <div class="mode-card active" data-mode="car">
+                            <span class="mode-icon">🚗</span>
+                            <span class="mode-time" id="car-time">-- dk</span>
+                            <small>Araba</small>
+                        </div>
+                        <div class="mode-card" data-mode="bike">
+                            <span class="mode-icon">🚲</span>
+                            <span class="mode-time" id="bike-time">-- dk</span>
+                            <small>Bisiklet</small>
+                        </div>
+                        <div class="mode-card" data-mode="walk">
+                            <span class="mode-icon">🚶</span>
+                            <span class="mode-time" id="walk-time">-- dk</span>
+                            <small>Yürüyüş</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="field">
+                            <label>Başlangıç Noktası</label>
+                            <div class="location-input-group">
+                                <div class="input-wrapper">
+                                    <input id="startInput" type="text">
+<div class="autocomplete-dropdown" id="start-autocomplete"></div>
+
+                                </div>
+                                <button class="map-select-btn" id="startMapBtn" disabled>
+                                    📍 Haritadan Seç
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+                    <div class="field">
+  <label>Durak Noktası</label>
+  <div class="location-input-group">
+    <div class="input-wrapper">
+      <input 
+        id="stopInput"
+        type="text"
+        placeholder="Durak adresi yazın"
+        autocomplete="off"
+      >
+      <div class="autocomplete-dropdown" id="stop-autocomplete"></div>
+    </div>
+    <button class="map-select-btn" id="addStopBtn">
+      📍 Haritadan Seç
+    </button>
+  </div>
+</div>
+
+
+                  <div class="field">
+  <label>Bitiş Noktası</label>
+  <div class="location-input-group">
+    <div class="input-wrapper">
+      <input 
+        id="endInput"
+        type="text"
+        placeholder="Varış adresi yazın"
+        autocomplete="off"
+      >
+      <div class="autocomplete-dropdown" id="end-autocomplete"></div>
+    </div>
+    <button class="map-select-btn" id="endMapBtn">
+      📍 Haritadan Seç
+    </button>
+  </div>
+</div>
+
+                    <div class="row">
+                        <div class="field small">
+                            <label>Algoritma</label>
+                            <select id="algorithm">
+                                <option value="dijkstra">Dijkstra's Algorithm</option>
+                            </select>
+                        </div>
+                        <div class="field small">
+                            <label>Trafik</label>
+                            <select id="traffic">
+                                <option value="light">Hafif</option>
+                                <option value="medium" selected>Orta</option>
+                                <option value="heavy">Yoğun</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="btncol">
+                        <button class="btn primary" id="calcBtn">📍 Rota Hesapla</button>
+                        <button class="btn ghost" id="clearBtn">🗑️ Temizle</button>
+                    </div>
+
+                    <div class="hint">
+                        💡 <b>Nasıl Kullanılır:</b><br>
+                        🔹 <b>Adres Yazın:</b> Yazarken otomatik öneriler çıkar<br>
+                        🔹 <b>Haritadan Seç:</b> Butona basıp haritaya tıklayın<br>
+                        🔹 <b>Çoklu Durak:</b> Haritaya birden fazla nokta ekleyin
+                    </div>
+
+                    <div class="info">
+                        <h3>📊 Rota Bilgileri</h3>
+                        <div class="infoBox">
+                            <div class="pill">
+                                Mesafe
+                                <small id="distance">0 km</small>
+                            </div>
+                            <div class="pill">
+                                Tahmini Süre
+                                <small id="duration">0 dk</small>
+                            </div>
+                        </div>
+
+                        <div class="directions">
+                            <h4>📍 Yol Tarifi</h4>
+                            <div class="dirBox" id="directions">
+                                <div class="dirStep">
+                                    Rota hesaplanınca adımlar burada görünecek.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>CENG 3511: Artificial Intelligence - Final Project 2025 </p>
+            <p>Sümeyye SARAY - 220709070</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="js/main.js"></script>
+    <link rel="icon" href="data:,">
+</body>
+
+</html>
