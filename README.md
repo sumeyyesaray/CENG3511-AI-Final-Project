@@ -65,7 +65,7 @@ This project is a web-based navigation application that allows users to select l
 
 ## 👩‍💻 Author
 
-**Sümeyye**  
+**Sümeyye SARAY**  
 Muğla Sıtkı Koçman University  
 Computer Engineering Student
 
